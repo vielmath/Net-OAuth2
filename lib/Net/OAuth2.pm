@@ -62,6 +62,10 @@ Report Issues on GitHub: http://github.com/keeth/Net-OAuth2/issues
 
 Download from CPAN: http://search.cpan.org/perldoc?Net::OAuth2
 
+=head1 TODO
+
+More tests, docs, and support for application profile
+
 =head1 AUTHOR
 
 Keith Grennan, C<< <kgrennan at cpan.org> >>
