@@ -25,7 +25,7 @@ get '/get/:site_id' => sub {
 
 get '/got/:site_id' => sub {
 	return wrap("Error: Missing access code") if (!defined params->{code});
-	my $access_token =  client(params->{site_id})->get_access_token(params->{code});
+	my $access_token =  client(params->{site_id})->get_access_token(code=>params->{code});
 	return wrap("Error: " . $access_token->to_string) if ($access_token->{error});
 	my $content = '<h2>Access token retrieved successfully!</h2><p>' . encode_entities($access_token->to_string) . '</p>';
 	my $response = $access_token->get(config->{sites}{params->{site_id}}{protected_resource_url} || config->{sites}{params->{site_id}}{protected_resource_path});

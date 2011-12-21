@@ -37,7 +37,7 @@ our $VERSION = '0.08';
   get '/auth/facebook/callback' => sub {
   
   	# Use the auth code to fetch the access token
-  	my $access_token =  client->get_access_token(params->{code});
+  	my $access_token =  client->get_access_token(code=>params->{code});
 	
   	# Use the access token to fetch a protected resource
   	my $response = $access_token->get('/me');
