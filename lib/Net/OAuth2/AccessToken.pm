@@ -5,56 +5,91 @@ use base qw(Class::Accessor::Fast);
 use JSON;
 use Carp;
 use URI::Escape;
-__PACKAGE__->mk_accessors(qw/client access_token refresh_token expires_in expires_at scope token_type/);
+__PACKAGE__->mk_accessors(qw/client refresh_token expires_in expires_at scope token_type/);
 
 sub new {
-  my $class = shift;
-  my %opts = @_;
-  my $self = bless \%opts, $class;
-  if (defined $self->{expires_in} and $self->{expires_in} =~ /^\d+$/) {
-    $self->expires_at(time() + $self->{expires_in});
-  }
-  else {
-    delete $self->{expires_in};
-  }
-  return $self;
+	my $class = shift;
+	my %opts = @_;
+	my $self = bless \%opts, $class;
+	if( defined $self->{expires_in} and $self->{expires_in} =~ /^\d+$/) {
+		$self->expires_at(time() + $self->{expires_in})
+			unless $self->{expires_at};
+	} else {
+		delete $self->{expires_in};
+	}
+	return $self;
 }
 
 # True if the token in question has an expiration time.
 sub expires {
-  my $self = shift;
-  return defined $self->expires_at;
+	my $self = shift;
+	return defined $self->expires_at;
+}
+
+sub expired {
+	my $self = shift;
+	return defined $self->expires_at && $self->expires_at <= time;
+}
+
+sub refresh {
+	my $self = shift;
+	if( defined $self->refresh_token ) {
+		my $head = HTTP::Headers->new( Content_Type => 'application/x-www-form-urlencoded' );
+		my $body = join('&',(
+			'client_id='.$self->client->id,
+			'client_secret='.$self->client->secret,
+			'refresh_token='.$self->refresh_token,
+			'grant_type=refresh_token',
+		));
+		my $req = HTTP::Request->new( POST => $self->access_token_url, $head, $body );
+		my $ans = $self->user_agent->request( $req );
+		$ans->is_success() or croak "Could not refresh access token: $ans->code / $ans->title";
+		my $dta = eval{local $SIG{__DIE__}; decode_json($ans->decoded_content)} || {};
+		$dta->{access_token} or croak "no access token found in refresh data...\n$ans->decoded_content";
+		$self->{access_token} = $dta->{access_token};
+		$dta->{expires_in} or croak "no expiration found in refresh data...\n$ans->decoded_content";
+		$self->expires_in( $dta->{expires_in} );
+		$self->expires_at( time() + $dta->{expires_in} );
+		$self->token_type( $dta->{token_type} ) if $dta->{token_type};
+	} else {
+		warn "unable to refresh access_token without refresh_token";
+	}
+	return $self->{access_token};
+}
+
+sub access_token {
+	my $self = shift;
+	$self->refresh() if $self->expired;
+	return $self->{access_token};
 }
 
 sub request {
-  my $self = shift;
-  my ($method, $uri, $header, $content) = @_;
-  my $request = HTTP::Request->new(
-    $method => $self->client->site_url($uri), $header, $content
-  );
-  # We assume a bearer token type, but could extend to other types in the future
-  my $bearer_token_scheme = $self->client->bearer_token_scheme;
-  my @bearer_token_scheme = split ':', $bearer_token_scheme;
-  if (lc($bearer_token_scheme[0]) eq 'auth-header') {
-    # Specs suggest using Bearer or OAuth2 for this value, but OAuth appears to be the de facto accepted value.
-    # Going to use OAuth until there is wide acceptance of something else.
-    my $auth_scheme = $bearer_token_scheme[1] || 'OAuth';
-    $request->headers->push_header(Authorization => $auth_scheme . " " . $self->access_token);
-  }
-  elsif (lc($bearer_token_scheme[0]) eq 'uri-query') {
-    my $query_param = $bearer_token_scheme[1] || 'oauth_token';
-    $request->uri->query_form($request->uri->query_form, $query_param => $self->access_token);
-  }
-  elsif (lc($bearer_token_scheme[0]) eq 'form-body') {
-    croak "Embedding access token in request body is only valid for 'application/x-www-form-urlencoded' content type"
-      unless $request->headers->content_type eq 'application/x-www-form-urlencoded';
-    my $query_param = $bearer_token_scheme[1] || 'oauth_token';
-    $request->add_content(
-      ((defined $request->content and length $request->content) ?  "&" : "") .  
-      uri_escape($query_param) . '=' . uri_escape($self->access_token)
-    );
-  }
-  return $self->client->request($request);
+	my $self = shift;
+	my ($method, $uri, $header, $content) = @_;
+	my $request = HTTP::Request->new(
+		$method => $self->client->site_url($uri), $header, $content
+	);
+	# We assume a bearer token type, but could extend to other types in the future
+	my $bearer_token_scheme = $self->client->bearer_token_scheme;
+	my @bearer_token_scheme = split ':', $bearer_token_scheme;
+	if (lc($bearer_token_scheme[0]) eq 'auth-header') {
+		# Specs suggest using Bearer or OAuth2 for this value, but OAuth appears to be the de facto accepted value.
+		# Going to use OAuth until there is wide acceptance of something else.
+		my $auth_scheme = $bearer_token_scheme[1] || 'OAuth';
+		$request->headers->push_header(Authorization => $auth_scheme.' '.$self->access_token);
+	} elsif (lc($bearer_token_scheme[0]) eq 'uri-query') {
+		my $query_param = $bearer_token_scheme[1] || 'oauth_token';
+		$request->uri->query_form($request->uri->query_form, $query_param => $self->access_token);
+	} elsif (lc($bearer_token_scheme[0]) eq 'form-body') {
+		croak "Embedding access token in request body is only valid for 'application/x-www-form-urlencoded' content type"
+		unless $request->headers->content_type eq 'application/x-www-form-urlencoded';
+		my $query_param = $bearer_token_scheme[1] || 'oauth_token';
+		$request->add_content(
+			((defined $request->content and length $request->content) ?  '&' : '') .  
+			uri_escape($query_param).'='.uri_escape($self->access_token)
+		);
+	}
+	return $self->client->request($request);
 }
 
 sub get {
@@ -73,13 +108,17 @@ sub put {
 	return shift->request('PUT', @_);
 }
 
-sub to_string {
+sub save {
 	my $self = shift;
 	my %hash;
 	for (qw/access_token token_type refresh_token expires_in scope error error_desription error_uri state/) {
 		$hash{$_} = $self->{$_} if defined $self->{$_};
 	}
-	return encode_json(\%hash);
+	return %hash;
+}
+
+sub to_string {
+	return encode_json({ shift->save });
 }
 
 =head1 NAME
