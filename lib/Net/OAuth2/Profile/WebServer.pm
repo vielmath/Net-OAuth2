@@ -38,8 +38,6 @@ sub get_access_token {
 		die "Fetch of access token failed: " . $response->status_line . ": " . $response->decoded_content
 			unless $response->is_success;
 		$dta = _parse_json($response->decoded_content);
-
-		#die "RESPONSE",$response->decoded_content;
 		$dta = _parse_query_string($response->decoded_content) unless defined $dta;
 		die "Unable to parse access token response '".substr($response->decoded_content, 0, 64)."'" unless defined $dta;
 	} else {
