@@ -11,9 +11,10 @@ sub new {
 	my $class = shift;
 	my %opts = @_;
 	my $self = bless \%opts, $class;
-	if( defined $self->{expires_in} and $self->{expires_in} =~ /^\d+$/) {
-		$self->expires_at(time() + $self->{expires_in})
-			unless $self->{expires_at};
+	if( defined $self->{expires_at} ) {
+		$self->refresh() if $self->expired;
+	} elsif( defined $self->{expires_in} and $self->{expires_in} =~ /^\d+$/) {
+		$self->expires_at(time() + $self->{expires_in});
 	} else {
 		delete $self->{expires_in};
 	}
