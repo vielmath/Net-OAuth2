@@ -98,9 +98,9 @@ sub get {
 }
 
 sub get_json {
-	my( $self, $uri ) = @_;
-	#my $r = shift->get(shift, { Accept => 'application/json; charset=utf-8' });
-	my $r = shift->get( $uri );
+	my $self = shift;
+	#Accept => 'application/json; charset=utf-8' ?
+	my $r = $self->get( @_ );
 	return $r->is_success()
 		? decode_json( $r->decoded_content )
 		: undef;
