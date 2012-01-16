@@ -121,7 +121,7 @@ sub put {
 sub save {
 	my $self = shift;
 	my %hash;
-	for (qw/access_token token_type refresh_token expires_in scope error error_desription error_uri state/) {
+	for (qw/access_token token_type refresh_token expires_at scope error error_desription error_uri state/) {
 		$hash{$_} = $self->{$_} if defined $self->{$_};
 	}
 	return %hash;
