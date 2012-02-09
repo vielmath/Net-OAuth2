@@ -28,30 +28,33 @@ sub expires {
 }
 
 sub expired {
-	my $self = shift;
-	return defined $self->expires_at && $self->expires_at <= time;
+	my $self  = shift;
+	my $delay = shift || 0;
+	return defined $self->expires_at && $self->expires_at <= $delay+time;
 }
 
 sub refresh {
 	my $self = shift;
 	if( defined $self->refresh_token ) {
-		my $head = HTTP::Headers->new( Content_Type => 'application/x-www-form-urlencoded' );
-		my $body = join('&',(
-			'client_id='.$self->client->id,
-			'client_secret='.$self->client->secret,
-			'refresh_token='.$self->refresh_token,
-			'grant_type=refresh_token',
-		));
-		my $req = HTTP::Request->new( POST => $self->client->access_token_url, $head, $body );
-		my $ans = $self->client->user_agent->request( $req );
-		$ans->is_success() or croak 'Could not refresh access token: '.$ans->code.' / '.$ans->title;
-		my $dta = eval{local $SIG{__DIE__}; decode_json($ans->decoded_content)} || {};
-		$dta->{access_token} or croak "no access token found in refresh data...\n".$ans->decoded_content;
-		$self->{access_token} = $dta->{access_token};
-		$dta->{expires_in} or croak "no expiration found in refresh data...\n".$ans->decoded_content;
-		$self->expires_in( $dta->{expires_in} );
-		$self->expires_at( time() + $dta->{expires_in} );
-		$self->token_type( $dta->{token_type} ) if $dta->{token_type};
+		if( !defined $self->expires_at() || $self->expired(60) ) {
+			my $head = HTTP::Headers->new( Content_Type => 'application/x-www-form-urlencoded' );
+			my $body = join('&',(
+				'client_id='.$self->client->id,
+				'client_secret='.$self->client->secret,
+				'refresh_token='.$self->refresh_token,
+				'grant_type=refresh_token',
+			));
+			my $req = HTTP::Request->new( POST => $self->client->access_token_url, $head, $body );
+			my $ans = $self->client->user_agent->request( $req );
+			$ans->is_success() or croak 'Could not refresh access token: '.$ans->code.' / '.$ans->title;
+			my $dta = eval{local $SIG{__DIE__}; decode_json($ans->decoded_content)} || {};
+			$dta->{access_token} or croak "no access token found in refresh data...\n".$ans->decoded_content;
+			$self->{access_token} = $dta->{access_token};
+			$dta->{expires_in} or croak "no expiration found in refresh data...\n".$ans->decoded_content;
+			$self->expires_in( $dta->{expires_in} );
+			$self->expires_at( time() + $dta->{expires_in} );
+			$self->token_type( $dta->{token_type} ) if $dta->{token_type};
+		}
 	} else {
 		croak 'unable to refresh access_token without refresh_token';
 	}
