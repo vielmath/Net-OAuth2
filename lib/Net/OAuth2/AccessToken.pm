@@ -94,7 +94,7 @@ sub request {
 		);
 	}
 	my $r = $self->client->request($request);
-	die $r->status_line() unless $r->is_success;
+	die( $r->status_line()."\n" ) unless $r->is_success;
 	return $r;
 }
 
