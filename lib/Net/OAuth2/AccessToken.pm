@@ -93,7 +93,9 @@ sub request {
 			uri_escape($query_param).'='.uri_escape($self->access_token)
 		);
 	}
-	return $self->client->request($request);
+	my $r = $self->client->request($request);
+	die $r->status_line() unless $r->is_success;
+	return $r;
 }
 
 sub get {
@@ -101,12 +103,8 @@ sub get {
 }
 
 sub get_json {
-	my $self = shift;
 	#Accept => 'application/json; charset=utf-8' ?
-	my $r = $self->get( @_ );
-	return $r->is_success()
-		? decode_json( $r->decoded_content )
-		: undef;
+	return decode_json( shift->get( @_ )->decoded_content )
 }
 
 sub post {
