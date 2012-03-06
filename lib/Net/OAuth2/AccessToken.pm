@@ -5,7 +5,7 @@ use base qw(Class::Accessor::Fast);
 use JSON;
 use Carp;
 use URI::Escape;
-__PACKAGE__->mk_accessors(qw/client refresh_token expires_in expires_at scope token_type/);
+__PACKAGE__->mk_accessors(qw/client refresh_token expires_in expires_at scope token_type auto_refresh /);
 
 sub new {
 	my $class = shift;
@@ -63,7 +63,7 @@ sub refresh {
 
 sub access_token {
 	my $self = shift;
-	$self->refresh() if $self->expired;
+	$self->refresh() if $self->expired && $self->auto_refresh;
 	return $self->{access_token};
 }
 
@@ -122,7 +122,7 @@ sub put {
 sub save {
 	my $self = shift;
 	my %hash;
-	for (qw/access_token token_type refresh_token expires_at scope error error_desription error_uri state/) {
+	for (qw/access_token token_type refresh_token expires_at scope error error_desription error_uri state auto_refresh/) {
 		$hash{$_} = $self->{$_} if defined $self->{$_};
 	}
 	return %hash;
