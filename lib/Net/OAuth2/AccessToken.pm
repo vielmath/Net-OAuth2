@@ -5,7 +5,7 @@ use base qw(Class::Accessor::Fast);
 use JSON;
 use Carp;
 use URI::Escape;
-__PACKAGE__->mk_accessors(qw/client refresh_token expires_in expires_at scope token_type auto_refresh /);
+__PACKAGE__->mk_accessors(qw/client refresh_token expires_in expires_at scope token_type site auto_refresh /);
 
 sub new {
 	my $class = shift;
@@ -70,8 +70,9 @@ sub access_token {
 sub request {
 	my $self = shift;
 	my ($method, $uri, $header, $content) = @_;
+
 	my $request = HTTP::Request->new(
-		$method => $self->client->site_url($uri), $header, $content
+		$method => $self->site_url($uri), $header, $content
 	);
 	# We assume a bearer token type, but could extend to other types in the future
 	my $bearer_token_scheme = $self->client->bearer_token_scheme;
@@ -94,7 +95,7 @@ sub request {
 		);
 	}
 	my $r = $self->client->request($request);
-	die( $r->status_line()."\n" ) unless $r->is_success;
+	die( $r->status_line()."\n".$r->decoded_content()."\n" ) unless $r->is_success;
 	return $r;
 }
 
@@ -122,7 +123,7 @@ sub put {
 sub save {
 	my $self = shift;
 	my %hash;
-	for (qw/access_token token_type refresh_token expires_at scope error error_desription error_uri state auto_refresh/) {
+	for (qw/access_token token_type refresh_token expires_at scope error error_desription error_uri state site auto_refresh/) {
 		$hash{$_} = $self->{$_} if defined $self->{$_};
 	}
 	return %hash;
@@ -130,6 +131,32 @@ sub save {
 
 sub to_string {
 	return encode_json({ shift->save });
+}
+
+=head2 site_url
+
+Returns url based on base held in site paramater - otherwise delegates to 
+the client
+
+=cut
+
+sub site_url {
+	my $self = shift;
+	my $path = shift;
+	my %params = @_;
+	my $url;
+	
+	if (defined $self->{site}) {
+		$url = URI->new_abs($path, $self->{site});
+		if (@_) {
+			$url->query_form($url->query_form , %params);
+		}
+	}
+	else {
+		$url = $self->client->site_url( $path, %params );
+	}
+
+	return $url;
 }
 
 =head1 NAME
