@@ -5,18 +5,19 @@ use base qw(Class::Accessor::Fast);
 use JSON;
 use Carp;
 use URI::Escape;
-__PACKAGE__->mk_accessors(qw/client refresh_token expires_in expires_at scope token_type site auto_refresh /);
+__PACKAGE__->mk_accessors(qw/client refresh_token expires_in expires_at scope token_type site auto_refresh refreshed/);
 
 sub new {
 	my $class = shift;
 	my %opts = @_;
 	my $self = bless \%opts, $class;
-	if( defined $self->{expires_at} ) {
-		$self->refresh() if $self->expired;
-	} elsif( defined $self->{expires_in} and $self->{expires_in} =~ /^\d+$/) {
+	$self->refreshed(0);
+	if( defined $self->{expires_at} && $self->{auto_refresh} ) {
+		$self->refresh();
+	} elsif( defined $self->{expires_in} and $self->{expires_in} =~ /^\d+$/ ) {
 		$self->expires_at(time() + $self->{expires_in});
 	} else {
-		delete $self->{expires_in};
+		croak "ain't got expires_in/at valid keys";
 	}
 	return $self;
 }
@@ -54,6 +55,7 @@ sub refresh {
 			$self->expires_in( $dta->{expires_in} );
 			$self->expires_at( time() + $dta->{expires_in} );
 			$self->token_type( $dta->{token_type} ) if $dta->{token_type};
+			$self->refreshed(1);
 		}
 	} else {
 		croak 'unable to refresh access_token without refresh_token';
@@ -63,7 +65,7 @@ sub refresh {
 
 sub access_token {
 	my $self = shift;
-	$self->refresh() if $self->expired && $self->auto_refresh;
+	$self->refresh() if !$self->expires() || ($self->expired && $self->auto_refresh);
 	return $self->{access_token};
 }
 
@@ -178,6 +180,5 @@ by the Free Software Foundation; or the Artistic License.
 See http://dev.perl.org/licenses/ for more information.
 
 =cut
-
 
 1;
