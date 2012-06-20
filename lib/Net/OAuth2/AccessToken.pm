@@ -47,7 +47,7 @@ sub refresh {
 			));
 			my $req = HTTP::Request->new( POST => $self->client->access_token_url, $head, $body );
 			my $ans = $self->client->user_agent->request( $req );
-			$ans->is_success() or croak 'Could not refresh access token: '.$ans->code.' / '.$ans->title;
+			$ans->is_success() or croak 'Could not refresh access token: '.$ans->code.' / '.$ans->content;
 			my $dta = eval{local $SIG{__DIE__}; decode_json($ans->decoded_content)} || {};
 			$dta->{access_token} or croak "no access token found in refresh data...\n".$ans->decoded_content;
 			$self->{access_token} = $dta->{access_token};
