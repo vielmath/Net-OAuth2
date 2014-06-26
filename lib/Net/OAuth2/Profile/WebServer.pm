@@ -44,7 +44,7 @@ sub get_access_token {
 		$dta = { %prm };
 	}
 	$dta->{client} = $self->client;
-	return Net::OAuth2::AccessToken->new(%$dta);
+	return Net::OAuth2::AccessToken->new(%$dta,no_refresh => $prm{no_refresh});
 }
 
 sub access_token_params {

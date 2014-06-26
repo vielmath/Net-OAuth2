@@ -5,7 +5,7 @@ use base qw(Class::Accessor::Fast);
 use JSON;
 use Carp;
 use URI::Escape;
-__PACKAGE__->mk_accessors(qw/client refresh_token expires_in expires_at scope token_type site auto_refresh refreshed/);
+__PACKAGE__->mk_accessors(qw/client refresh_token expires_in expires_at scope token_type site auto_refresh refreshed no_refresh/);
 
 sub new {
 	my $class = shift;
@@ -16,9 +16,9 @@ sub new {
 		$self->refresh();
 	} elsif( defined $self->{expires_in} and $self->{expires_in} =~ /^\d+$/ ) {
 		$self->expires_at(time() + $self->{expires_in});
-	} else {
+	} else {unless ($self->{no_refresh}){
 		croak "ain't got expires_in/at valid keys";
-	}
+	}}
 	return $self;
 }
 
@@ -65,14 +65,13 @@ sub refresh {
 
 sub access_token {
 	my $self = shift;
-	$self->refresh() if !$self->expires() || ($self->expired && $self->auto_refresh);
+	$self->refresh() if !$self->{no_refresh} && (!$self->expires() || ($self->expired && $self->auto_refresh));
 	return $self->{access_token};
 }
 
 sub request {
 	my $self = shift;
 	my ($method, $uri, $header, $content) = @_;
-
 	my $request = HTTP::Request->new(
 		$method => $self->site_url($uri), $header, $content
 	);
@@ -182,3 +181,4 @@ See http://dev.perl.org/licenses/ for more information.
 =cut
 
 1;
+
